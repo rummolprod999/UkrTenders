@@ -6,6 +6,6 @@ module UkrModule =
     
     [<EntryPoint>]
     let main argv =  
-        Setting.getSettings()
+        Parser.Parsing()
         0 // return an integer exit code
 

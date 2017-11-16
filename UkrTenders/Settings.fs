@@ -36,8 +36,12 @@ module Setting =
         if xRoot <> null then 
             for xnode in xRoot do
                 if (xnode :?> XmlNode).Name = "database" then Database <- (xnode :?> XmlNode).InnerText
-                elif (xnode :?> XmlNode).Name = "tempdir_tenders" then TempPathTenders <- (xnode :?> XmlNode).InnerText
-                elif (xnode :?> XmlNode).Name = "logdir_tenders" then LogPathTenders <- (xnode :?> XmlNode).InnerText
+                elif (xnode :?> XmlNode).Name = "tempdir_tenders_ukr" then 
+                    TempPathTenders <- sprintf "%s%c%s" PathProgram Path.DirectorySeparatorChar 
+                                           (xnode :?> XmlNode).InnerText
+                elif (xnode :?> XmlNode).Name = "logdir_tenders_ukr" then 
+                    LogPathTenders <- sprintf "%s%c%s" PathProgram Path.DirectorySeparatorChar 
+                                          (xnode :?> XmlNode).InnerText
                 elif (xnode :?> XmlNode).Name = "prefix" then Prefix <- (xnode :?> XmlNode).InnerText
                 elif (xnode :?> XmlNode).Name = "userdb" then UserDb <- (xnode :?> XmlNode).InnerText
                 elif (xnode :?> XmlNode).Name = "passdb" then PassDb <- (xnode :?> XmlNode).InnerText

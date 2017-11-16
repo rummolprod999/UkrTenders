@@ -57,7 +57,11 @@
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="Settings.fs" />
+    <Compile Include="Tools.fs" />
+    <Compile Include="Parsing.fs" />
+    <Compile Include="Parser.fs" />
     <Compile Include="Program.fs" />
+    
     <Content Include="packages.config" />
     <None Include="App.config" />
     <None Include="docs\MySqlCommand.xml" />

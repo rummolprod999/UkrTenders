@@ -6,8 +6,11 @@
       <e p="UkrTenders" t="IncludeRecursive">
         <e p="App.config" t="Include" />
         <e p="AssemblyInfo.fs" t="Include" />
+        <e p="Parser.fs" t="Include" />
+        <e p="Parsing.fs" t="Include" />
         <e p="Program.fs" t="Include" />
         <e p="Settings.fs" t="Include" />
+        <e p="Tools.fs" t="Include" />
         <e p="UkrTenders.fsproj" t="IncludeRecursive" />
         <e p="bin" t="ExcludeRecursive" />
         <e p="docs" t="Include">

@@ -42,8 +42,7 @@ module Setting =
                 elif (xnode :?> XmlNode).Name = "userdb" then UserDb <- (xnode :?> XmlNode).InnerText
                 elif (xnode :?> XmlNode).Name = "passdb" then PassDb <- (xnode :?> XmlNode).InnerText
                 elif (xnode :?> XmlNode).Name = "server" then Server <- (xnode :?> XmlNode).InnerText
-                else 
-                    if (xnode :?> XmlNode).Name = "port" then Port <- Int32.Parse((xnode :?> XmlNode).InnerText)
+                elif (xnode :?> XmlNode).Name = "port" then Port <- Int32.Parse((xnode :?> XmlNode).InnerText)
             { Database = Database
               TempPathTenders = TempPathTenders
               LogPathTenders = LogPathTenders

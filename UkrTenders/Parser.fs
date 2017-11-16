@@ -6,6 +6,10 @@ open System.IO
 module Parser = 
     let Parser() = 
         Logging.Log.logger ("Начало парсинга")
+        try
+            Parsing.Parsing()
+        with
+        | _ as ex -> Logging.Log.logger(ex.Message) 
         Logging.Log.logger ("Конец парсинга")
     
     let init (s : Setting.T) = 

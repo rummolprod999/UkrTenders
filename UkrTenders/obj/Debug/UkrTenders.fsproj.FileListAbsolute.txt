@@ -1,0 +1,13 @@
+/home/alex/RiderProjects/UkrTenders/UkrTenders/bin/Debug/UkrTenders.exe.config
+/home/alex/RiderProjects/UkrTenders/UkrTenders/bin/Debug/UkrTenders.xml
+/home/alex/RiderProjects/UkrTenders/UkrTenders/bin/Debug/UkrTenders.exe
+/home/alex/RiderProjects/UkrTenders/UkrTenders/bin/Debug/FSharp.Core.dll
+/home/alex/RiderProjects/UkrTenders/UkrTenders/bin/Debug/MySql.Data.dll
+/home/alex/RiderProjects/UkrTenders/UkrTenders/bin/Debug/Newtonsoft.Json.dll
+/home/alex/RiderProjects/UkrTenders/UkrTenders/bin/Debug/System.ValueTuple.dll
+/home/alex/RiderProjects/UkrTenders/UkrTenders/bin/Debug/MySql.Data.xml
+/home/alex/RiderProjects/UkrTenders/UkrTenders/bin/Debug/Newtonsoft.Json.xml
+/home/alex/RiderProjects/UkrTenders/UkrTenders/bin/Debug/FSharp.Core.xml
+/home/alex/RiderProjects/UkrTenders/UkrTenders/obj/Debug/UkrTenders.fsprojResolveAssemblyReference.cache
+/home/alex/RiderProjects/UkrTenders/UkrTenders/obj/Debug/UkrTenders.fsproj.CoreCompileInputs.cache
+/home/alex/RiderProjects/UkrTenders/UkrTenders/obj/Debug/UkrTenders.exe

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<setting>
+	<database>tender</database>
+	<tempdir_tenders_ukr>temp_tenders_ukr</tempdir_tenders_ukr>
+	<logdir_tenders_ukr>log_tenders_ukr</logdir_tenders_ukr>
+	<prefix></prefix>
+	<userdb>root</userdb>
+	<passdb>1234</passdb>
+	<server>localhost</server>
+	<port>3306</port>
+	<years>2016, 2017</years>
+</setting>

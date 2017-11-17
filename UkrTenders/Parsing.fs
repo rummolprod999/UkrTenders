@@ -18,11 +18,11 @@ module Parsing =
         match t with
         | null -> ""
         | _ -> ((string) t).Trim()
-        
+    
     let testdate (t : string) : DateTime = 
-            match t with
-            | null -> DateTime.MinValue
-            | _ -> DateTime.Parse(((string) t).Trim('"'))
+        match t with
+        | null -> DateTime.MinValue
+        | _ -> DateTime.Parse(((string) t).Trim('"'))
     
     type Imperative<'T> = unit -> option<'T>
     
@@ -42,28 +42,52 @@ module Parsing =
             | Some(v) -> v
             | _ -> failwith "Nothing returned!"
     
-    let parser (o : JObject) (stn : Setting.T) (con : MySqlConnection) : unit = 
+    let ParserT (d : JToken) (stn : Setting.T) (con : MySqlConnection) : unit = 
+        con.Open()
+        let id = teststring <| d.SelectToken("id")
+        let dateModified = testdate <| JsonConvert.SerializeObject(d.SelectToken("dateModified"))
+        let selectTend = 
+            sprintf 
+                "SELECT id_tender FROM %stender WHERE id_xml = @id_xml AND date_version = @date_version AND type_fz = 5" 
+                stn.Prefix
+        let cmd : MySqlCommand = new MySqlCommand(selectTend, con)
+        cmd.Prepare()
+        cmd.Parameters.AddWithValue("@id_xml", id) |> ignore
+        cmd.Parameters.AddWithValue("@date_version", dateModified) |> ignore
+        let reader : MySqlDataReader = cmd.ExecuteReader()
+        if reader.HasRows then reader.Close()
+        else 
+            reader.Close()
+            let mutable cancelStatus = 0
+            let selectDateT = 
+                sprintf "SELECT id_tender, date_version, cancel FROM %stender WHERE id_xml = @id_xml AND type_fz = 5" 
+                    stn.Prefix
+            let cmd2 = new MySqlCommand(selectDateT, con)
+            cmd2.Prepare()
+            cmd2.Parameters.AddWithValue("@id_xml", id) |> ignore
+            let adapter = new MySqlDataAdapter()
+            adapter.SelectCommand <- cmd2
+            let dt = new DataTable()
+            adapter.Fill(dt) |> ignore
+            for row in dt.Rows do
+                //printfn "%A" <| (row.["date_version"])
+                match dateModified >= ((row.["date_version"]) :?> DateTime) with
+                | true -> row.["cancel"] <- 1
+                | false -> cancelStatus <- 1
+            let commandBuilder = new MySqlCommandBuilder(adapter)
+            commandBuilder.ConflictOption <- ConflictOption.OverwriteChanges
+            adapter.Update(dt) |> ignore
+            
+        ()
+    
+    let parserL (o : JObject) (stn : Setting.T) (connectstring : string) : unit = 
         let uri = teststring <| o.SelectToken("next_page.uri")
         //printfn "%A" uri
         let tdata = o.SelectToken("data") :?> JArray
         for d in tdata do
-            let id = teststring <| d.SelectToken("id")
-            let dateModified = testdate <| JsonConvert.SerializeObject(d.SelectToken("dateModified"))
-            let selectTend = sprintf "SELECT id_tender FROM %stender WHERE purchase_number = @purchase_number AND date_version = @date_version AND type_fz = 5" stn.Prefix
-            let cmd : MySqlCommand = new MySqlCommand(selectTend, con)
-            cmd.Prepare()
-            cmd.Parameters.AddWithValue("@purchase_number", id) |> ignore
-            cmd.Parameters.AddWithValue("@date_version", dateModified) |> ignore
-            let reader : MySqlDataReader = cmd.ExecuteReader()
-            if reader.HasRows then
-                reader.Close()
-            else
-                printfn "No tender"
-            
-            ()
-        
-            
-            
+            try 
+                using (new MySqlConnection(connectstring)) (ParserT d stn)
+            with ex -> Logging.Log.logger ex
     
     let ParsungListTenders (j : JObject) (sett : Setting.T) = 
         let connectstring = 
@@ -71,8 +95,8 @@ module Parsing =
                 "Server=%s;port=%d;Database=%s;User Id=%s;password=%s;CharSet=utf8;Convert Zero Datetime=True;default command timeout=3600;Connection Timeout=3600" 
                 sett.Server sett.Port sett.Database sett.UserDb sett.PassDb
         try 
-            using (new MySqlConnection(connectstring)) (parser j sett)
-        with x -> Logging.Log.logger (x)
+            parserL j sett connectstring
+        with x -> Logging.Log.logger x
     
     let Parsing(st : Setting.T) = 
         //let s = Download.DownloadString("https://stackoverflow.com/questions/15212133/increment-value-in-f")

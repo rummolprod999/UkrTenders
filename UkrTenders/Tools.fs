@@ -46,4 +46,5 @@ module Download =
                     Logging.Log.logger (sprintf "Не удалось скачать xml за %d попыток" !count)
                     continueLooping <- false
                 else incr count
+                Thread.Sleep(5000)
         s

@@ -21,7 +21,7 @@ module Parsing =
     
     let testdate (t : string) : DateTime = 
         match t with
-        | null -> DateTime.MinValue
+        | null | "null" -> DateTime.MinValue
         | _ -> DateTime.Parse(((string) t).Trim('"'))
     
     type Imperative<'T> = unit -> option<'T>
@@ -77,7 +77,13 @@ module Parsing =
             let commandBuilder = new MySqlCommandBuilder(adapter)
             commandBuilder.ConflictOption <- ConflictOption.OverwriteChanges
             adapter.Update(dt) |> ignore
-            
+            let ten = Download.DownloadString <| sprintf "http://public.api.openprocurement.org/api/2.4/tenders/%s" id
+            let jsn = JObject.Parse(ten)
+            (*let enquiryPeriodstartDateS = (string) <| JsonConvert.SerializeObject(jsn.SelectToken("data.enquiryPeriod.startDate"))
+            printfn "%A %d" enquiryPeriodstartDateS enquiryPeriodstartDateS.Length*)
+            let enquiryPeriodstartDate = 
+                testdate <| JsonConvert.SerializeObject(jsn.SelectToken("data.enquiryPeriod.startDate"))
+            printfn "%A" enquiryPeriodstartDate
         ()
     
     let parserL (o : JObject) (stn : Setting.T) (connectstring : string) : unit = 

@@ -4,12 +4,12 @@ open System
 open System.IO
 
 module Parser = 
-    let Parser() = 
+    let Parser (st: Setting.T) = 
         Logging.Log.logger ("Начало парсинга")
         try
-            Parsing.Parsing()
+            Parsing.Parsing(st)
         with
-        | _ as ex -> Logging.Log.logger(ex.Message) 
+        | _ as ex -> Logging.Log.logger(ex) 
         Logging.Log.logger ("Конец парсинга")
     
     let init (s : Setting.T) = 
@@ -31,5 +31,5 @@ module Parser =
     
     let Parsing() : unit = 
         let Set = Setting.getSettings()
-        init (Set)
-        Parser()
+        init Set
+        Parser Set

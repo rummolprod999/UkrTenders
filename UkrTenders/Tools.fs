@@ -30,7 +30,7 @@ module Download =
             wr
     
     let DownloadString url = 
-        let mutable s = ""
+        let mutable s = null
         let count = ref 0
         let mutable continueLooping = true
         while continueLooping do

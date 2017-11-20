@@ -100,6 +100,7 @@ module Parsing =
                 resString.Add(sprintf "%s %s " name okpdName)
                 
                 
+                
         ()
     let ParserT (d : JToken) (stn : Setting.T) (con : MySqlConnection) : unit = 
         con.Open()

@@ -9,6 +9,7 @@ open System.Data
 open System.Xml
 
 module Parsing = 
+    let tenderCount = ref 0
     let testint (t : JToken) : int = 
         match t with
         | null -> 0
@@ -77,7 +78,8 @@ module Parsing =
             let commandBuilder = new MySqlCommandBuilder(adapter)
             commandBuilder.ConflictOption <- ConflictOption.OverwriteChanges
             adapter.Update(dt) |> ignore
-            let ten = Download.DownloadString <| sprintf "http://public.api.openprocurement.org/api/2.4/tenders/%s" id
+            let tenurl = sprintf "http://public.api.openprocurement.org/api/2.4/tenders/%s" id
+            let ten = Download.DownloadString tenurl
             let jsn = JObject.Parse(ten)
             (*let enquiryPeriodstartDateS = (string) <| JsonConvert.SerializeObject(jsn.SelectToken("data.enquiryPeriod.startDate"))
             printfn "%A %d" enquiryPeriodstartDateS enquiryPeriodstartDateS.Length*)
@@ -108,14 +110,14 @@ module Parsing =
                     let legalName = teststring <| jsn.SelectToken("data.procuringEntity.identifier.legalName")
                     let telephone = teststring <| jsn.SelectToken("data.procuringEntity.contactPoint.telephone")
                     let name = teststring <| jsn.SelectToken("data.procuringEntity.contactPoint.name")
-                    let email = teststring <| jsn.SelectToken("data.procuringEntity.contactPoint.name")
+                    let email = teststring <| jsn.SelectToken("data.procuringEntity.contactPoint.email")
                     let postalCode = teststring <| jsn.SelectToken("data.procuringEntity.address.postalCode")
                     let countryName = teststring <| jsn.SelectToken("data.procuringEntity.address.countryName")
                     let streetAddress = teststring <| jsn.SelectToken("data.procuringEntity.address.streetAddress")
                     let locality = teststring <| jsn.SelectToken("data.procuringEntity.address.locality")
                     let region = teststring <| jsn.SelectToken("data.procuringEntity.address.region")
                     let factAddress = 
-                        (sprintf "%s %s %s %s %s" postalCode countryName region streetAddress locality).Trim()
+                        (sprintf "%s %s %s %s %s" postalCode countryName region locality streetAddress).Trim()
                     let addOrganizer = 
                         sprintf 
                             "INSERT INTO %sorganizer SET full_name = @full_name, post_address = @post_address, fact_address = @fact_address, inn = @inn, contact_person = @contact_person, contact_email = @contact_email, contact_phone = @contact_phone" 
@@ -130,7 +132,103 @@ module Parsing =
                     cmd5.Parameters.AddWithValue("@contact_phone", telephone) |> ignore
                     cmd5.ExecuteNonQuery() |> ignore
                     IdOrg := int cmd5.LastInsertedId
-            printfn "%d" !IdOrg
+            let idPlacingWay = ref 0
+            let placingWayName = teststring <| jsn.SelectToken("data.submissionMethod")
+            if placingWayName <> "" then 
+                let selectPlacingWay = sprintf "SELECT id_placing_way FROM %splacing_way WHERE name= @name" stn.Prefix
+                let cmd6 = new MySqlCommand(selectPlacingWay, con)
+                cmd6.Prepare()
+                cmd6.Parameters.AddWithValue("@name", placingWayName) |> ignore
+                let reader3 = cmd6.ExecuteReader()
+                match reader3.HasRows with
+                | true -> 
+                    reader3.Read() |> ignore
+                    idPlacingWay := reader3.GetInt32("id_placing_way")
+                    reader3.Close()
+                | false -> 
+                    reader3.Close()
+                    let insertPlacingWay = sprintf "INSERT INTO %splacing_way SET name= @name" stn.Prefix
+                    let cmd7 = new MySqlCommand(insertPlacingWay, con)
+                    cmd7.Prepare()
+                    cmd7.Parameters.AddWithValue("@name", placingWayName) |> ignore
+                    cmd7.ExecuteNonQuery() |> ignore
+                    idPlacingWay := int cmd7.LastInsertedId
+            let idEtp = ref 0
+            let etpName = "ProZorro"
+            let etpUrl = "https://prozorro.gov.ua"
+            if etpName <> "" then 
+                let selectEtp = sprintf "SELECT id_etp FROM %setp WHERE name = @name AND url = @url" stn.Prefix
+                let cmd6 = new MySqlCommand(selectEtp, con)
+                cmd6.Prepare()
+                cmd6.Parameters.AddWithValue("@name", etpName) |> ignore
+                cmd6.Parameters.AddWithValue("@url", etpUrl) |> ignore
+                let reader3 = cmd6.ExecuteReader()
+                match reader3.HasRows with
+                | true -> 
+                    reader3.Read() |> ignore
+                    idEtp := reader3.GetInt32("id_etp")
+                    reader3.Close()
+                | false -> 
+                    reader3.Close()
+                    let insertEtp = sprintf "INSERT INTO %setp SET name= @name, url= @url, conf=0" stn.Prefix
+                    let cmd7 = new MySqlCommand(insertEtp, con)
+                    cmd7.Prepare()
+                    cmd7.Parameters.AddWithValue("@name", etpName) |> ignore
+                    cmd7.Parameters.AddWithValue("@url", etpUrl) |> ignore
+                    cmd7.ExecuteNonQuery() |> ignore
+                    idEtp := int cmd7.LastInsertedId
+            let startDate = testdate <| JsonConvert.SerializeObject(jsn.SelectToken("data.tenderPeriod.startDate"))
+            let endDate = testdate <| JsonConvert.SerializeObject(jsn.SelectToken("data.tenderPeriod.endDate"))
+            let biddingDate = testdate <| JsonConvert.SerializeObject(jsn.SelectToken("data.auctionPeriod.startDate"))
+            let scoringDate = DateTime.MinValue
+            let numVersion = 0
+            let idTender = ref 0
+            let insertTender = 
+                sprintf 
+                    "INSERT INTO %stender SET id_xml = @id_xml, purchase_number = @purchase_number, doc_publish_date = @doc_publish_date, href = @href, purchase_object_info = @purchase_object_info, type_fz = @type_fz, id_organizer = @id_organizer, id_placing_way = @id_placing_way, id_etp = @id_etp, end_date = @end_date, scoring_date = @scoring_date, bidding_date = @bidding_date, cancel = @cancel, date_version = @date_version, num_version = @num_version, notice_version = @notice_version, xml = @xml, print_form = @print_form" 
+                    stn.Prefix
+            let cmd9 = new MySqlCommand(insertTender, con)
+            cmd9.Prepare()
+            cmd9.Parameters.AddWithValue("@id_xml", id) |> ignore
+            cmd9.Parameters.AddWithValue("@purchase_number", tenderID) |> ignore
+            cmd9.Parameters.AddWithValue("@doc_publish_date", startDate) |> ignore
+            cmd9.Parameters.AddWithValue("@href", href) |> ignore
+            cmd9.Parameters.AddWithValue("@purchase_object_info", PurchaseObjectInfo) |> ignore
+            cmd9.Parameters.AddWithValue("@type_fz", 5) |> ignore
+            cmd9.Parameters.AddWithValue("@id_organizer", !IdOrg) |> ignore
+            cmd9.Parameters.AddWithValue("@id_placing_way", !idPlacingWay) |> ignore
+            cmd9.Parameters.AddWithValue("@id_etp", !idEtp) |> ignore
+            cmd9.Parameters.AddWithValue("@end_date", endDate) |> ignore
+            cmd9.Parameters.AddWithValue("@scoring_date", scoringDate) |> ignore
+            cmd9.Parameters.AddWithValue("@bidding_date", biddingDate) |> ignore
+            cmd9.Parameters.AddWithValue("@cancel", cancelStatus) |> ignore
+            cmd9.Parameters.AddWithValue("@date_version", dateModified) |> ignore
+            cmd9.Parameters.AddWithValue("@num_version", numVersion) |> ignore
+            cmd9.Parameters.AddWithValue("@notice_version", NoticeVersion) |> ignore
+            cmd9.Parameters.AddWithValue("@xml", tenurl) |> ignore
+            cmd9.Parameters.AddWithValue("@print_form", Printform) |> ignore
+            cmd9.ExecuteNonQuery() |> ignore
+            idTender := int cmd9.LastInsertedId
+            inc tenderCount
+            let doctend = jsn.SelectToken("data.documents")
+            if doctend <> null then 
+                for doc in jsn.SelectToken("data.documents") do
+                    let attachName = teststring <| doc.SelectToken("title")
+                    let attachDescription = teststring <| doc.SelectToken("documentType")
+                    let attachUrl = teststring <| doc.SelectToken("url")
+                    if attachUrl <> "" then 
+                        let insertAttach = 
+                            sprintf 
+                                "INSERT INTO %sattachment SET id_tender = @id_tender, file_name = @file_name, url = @url, description = @description" 
+                                stn.Prefix
+                        let cmd11 = new MySqlCommand(insertAttach, con)
+                        cmd11.Prepare()
+                        cmd11.Parameters.AddWithValue("@id_tender", !idTender) |> ignore
+                        cmd11.Parameters.AddWithValue("@file_name", attachName) |> ignore
+                        cmd11.Parameters.AddWithValue("@url", attachUrl) |> ignore
+                        cmd11.Parameters.AddWithValue("@description", attachDescription) |> ignore
+                        cmd11.ExecuteNonQuery() |> ignore
+            printfn "%d" !idTender
         ()
     
     let parserL (o : JObject) (stn : Setting.T) (connectstring : string) : unit = 
@@ -139,8 +237,9 @@ module Parsing =
         let tdata = o.SelectToken("data") :?> JArray
         for d in tdata do
             try 
+                let id = d.SelectToken("id")
                 using (new MySqlConnection(connectstring)) (ParserT d stn)
-            with ex -> Logging.Log.logger ex
+            with ex -> Logging.Log.logger(ex, id)
     
     let ParsungListTenders (j : JObject) (sett : Setting.T) = 
         let connectstring = 

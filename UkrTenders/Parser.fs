@@ -11,6 +11,7 @@ module Parser =
         with
         | _ as ex -> Logging.Log.logger(ex) 
         Logging.Log.logger ("Конец парсинга")
+        Logging.Log.logger (sprintf "Добавили тендеров %d" !Parsing.tenderCount)
     
     let init (s : Setting.T) = 
         if String.IsNullOrEmpty(s.TempPathTenders) || String.IsNullOrEmpty(s.LogPathTenders) then 

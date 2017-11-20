@@ -83,7 +83,54 @@ module Parsing =
             printfn "%A %d" enquiryPeriodstartDateS enquiryPeriodstartDateS.Length*)
             let enquiryPeriodstartDate = 
                 testdate <| JsonConvert.SerializeObject(jsn.SelectToken("data.enquiryPeriod.startDate"))
-            printfn "%A" enquiryPeriodstartDate
+            //printfn "%A" enquiryPeriodstartDate
+            let tenderID = teststring <| jsn.SelectToken("data.tenderID")
+            let href = sprintf "https://prozorro.gov.ua/tender/%s" tenderID
+            let description = teststring <| jsn.SelectToken("data.description")
+            let PurchaseObjectInfo = description |> sprintf "%s %s" (teststring <| (jsn.SelectToken("data.title")))
+            let NoticeVersion = ""
+            let Printform = href
+            let identifierId = teststring <| jsn.SelectToken("data.procuringEntity.identifier.id")
+            let IdOrg = ref 0
+            if identifierId <> "" then 
+                let selectOrg = sprintf "SELECT id_organizer FROM %sorganizer WHERE inn = @inn" stn.Prefix
+                let cmd3 = new MySqlCommand(selectOrg, con)
+                cmd3.Prepare()
+                cmd3.Parameters.AddWithValue("@inn", identifierId) |> ignore
+                let reader = cmd3.ExecuteReader()
+                match reader.HasRows with
+                | true -> 
+                    reader.Read() |> ignore
+                    IdOrg := reader.GetInt32("id_organizer")
+                    reader.Close()
+                | false -> 
+                    reader.Close()
+                    let legalName = teststring <| jsn.SelectToken("data.procuringEntity.identifier.legalName")
+                    let telephone = teststring <| jsn.SelectToken("data.procuringEntity.contactPoint.telephone")
+                    let name = teststring <| jsn.SelectToken("data.procuringEntity.contactPoint.name")
+                    let email = teststring <| jsn.SelectToken("data.procuringEntity.contactPoint.name")
+                    let postalCode = teststring <| jsn.SelectToken("data.procuringEntity.address.postalCode")
+                    let countryName = teststring <| jsn.SelectToken("data.procuringEntity.address.countryName")
+                    let streetAddress = teststring <| jsn.SelectToken("data.procuringEntity.address.streetAddress")
+                    let locality = teststring <| jsn.SelectToken("data.procuringEntity.address.locality")
+                    let region = teststring <| jsn.SelectToken("data.procuringEntity.address.region")
+                    let factAddress = 
+                        (sprintf "%s %s %s %s %s" postalCode countryName region streetAddress locality).Trim()
+                    let addOrganizer = 
+                        sprintf 
+                            "INSERT INTO %sorganizer SET full_name = @full_name, post_address = @post_address, fact_address = @fact_address, inn = @inn, contact_person = @contact_person, contact_email = @contact_email, contact_phone = @contact_phone" 
+                            stn.Prefix
+                    let cmd5 = new MySqlCommand(addOrganizer, con)
+                    cmd5.Parameters.AddWithValue("@full_name", legalName) |> ignore
+                    cmd5.Parameters.AddWithValue("@post_address", factAddress) |> ignore
+                    cmd5.Parameters.AddWithValue("@fact_address", factAddress) |> ignore
+                    cmd5.Parameters.AddWithValue("@inn", identifierId) |> ignore
+                    cmd5.Parameters.AddWithValue("@contact_person", name) |> ignore
+                    cmd5.Parameters.AddWithValue("@contact_email", email) |> ignore
+                    cmd5.Parameters.AddWithValue("@contact_phone", telephone) |> ignore
+                    cmd5.ExecuteNonQuery() |> ignore
+                    IdOrg := int cmd5.LastInsertedId
+            printfn "%d" !IdOrg
         ()
     
     let parserL (o : JObject) (stn : Setting.T) (connectstring : string) : unit = 

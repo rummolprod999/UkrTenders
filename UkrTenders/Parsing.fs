@@ -7,13 +7,21 @@ open System
 open System.Collections.Generic
 open System.Data
 open System.Xml
+open System.Text
+open System.Linq
 
 module Parsing = 
     let tenderCount = ref 0
+    
     let testint (t : JToken) : int = 
         match t with
         | null -> 0
         | _ -> (int) t
+    
+    let testfloat (t : JToken) : float = 
+        match t with
+        | null -> 0.
+        | _ -> (float) t
     
     let teststring (t : JToken) : string = 
         match t with
@@ -43,6 +51,56 @@ module Parsing =
             | Some(v) -> v
             | _ -> failwith "Nothing returned!"
     
+    let AddVerNumber (con : MySqlConnection) (pn : string) (stn : Setting.T) : unit = 
+        let verNum = ref 1
+        let selectTenders = 
+            sprintf 
+                "SELECT id_tender FROM %stender WHERE purchase_number = @purchaseNumber AND type_fz = 5 ORDER BY UNIX_TIMESTAMP(date_version) ASC" 
+                stn.Prefix
+        let cmd1 = new MySqlCommand(selectTenders, con)
+        cmd1.Prepare()
+        cmd1.Parameters.AddWithValue("@purchaseNumber", pn) |> ignore
+        let dt1 = new DataTable()
+        let adapter1 = new MySqlDataAdapter()
+        adapter1.SelectCommand <- cmd1
+        adapter1.Fill(dt1) |> ignore
+        if dt1.Rows.Count > 0 then 
+            let updateTender = 
+                sprintf "UPDATE %stender SET num_version = @num_version WHERE id_tender = @id_tender" stn.Prefix
+            for ten in dt1.Rows do
+                let idTender = (ten.["id_tender"] :?> int)
+                let cmd2 = new MySqlCommand(updateTender, con)
+                cmd2.Prepare()
+                cmd2.Parameters.AddWithValue("@id_tender", idTender) |> ignore
+                cmd2.Parameters.AddWithValue("@num_version", !verNum) |> ignore
+                cmd2.ExecuteNonQuery() |> ignore
+                incr verNum
+        ()
+    let TenderKwords (con : MySqlConnection) (idTender : int) (stn : Setting.T) : unit =
+        let resString = new StringBuilder()
+        let selectPurObj = sprintf "SELECT DISTINCT po.name, po.okpd_name FROM %spurchase_object AS po LEFT JOIN %slot AS l ON l.id_lot = po.id_lot WHERE l.id_tender = @id_tender" stn.Prefix stn.Prefix
+        let cmd1 = new MySqlCommand(selectPurObj, con)
+        cmd1.Prepare();
+        cmd1.Parameters.AddWithValue("@id_tender", idTender) |> ignore
+        let dt = new DataTable()
+        let adapter = new MySqlDataAdapter()
+        adapter.SelectCommand <- cmd1
+        adapter.Fill(dt) |> ignore
+        if dt.Rows.Count > 0 then
+            let distrDt = dt.AsEnumerable().Distinct(DataRowComparer.Default)
+            for row in distrDt do
+                let name = 
+                    match row.IsNull("name") with
+                    | true -> ""
+                    | false -> row.["name"]
+                let okpdName = 
+                    match row.IsNull("okpd_name") with
+                       | true -> ""
+                       | false -> row.["okpd_name"]
+                resString.Add(sprintf "%s %s " name okpdName)
+                
+                
+        ()
     let ParserT (d : JToken) (stn : Setting.T) (con : MySqlConnection) : unit = 
         con.Open()
         let id = teststring <| d.SelectToken("id")
@@ -209,7 +267,7 @@ module Parsing =
             cmd9.Parameters.AddWithValue("@print_form", Printform) |> ignore
             cmd9.ExecuteNonQuery() |> ignore
             idTender := int cmd9.LastInsertedId
-            inc tenderCount
+            incr tenderCount
             let doctend = jsn.SelectToken("data.documents")
             if doctend <> null then 
                 for doc in jsn.SelectToken("data.documents") do
@@ -228,6 +286,98 @@ module Parsing =
                         cmd11.Parameters.AddWithValue("@url", attachUrl) |> ignore
                         cmd11.Parameters.AddWithValue("@description", attachDescription) |> ignore
                         cmd11.ExecuteNonQuery() |> ignore
+            let lotNumber = 1
+            let idLot = ref 0
+            let lotMaxPrice = testfloat <| jsn.SelectToken("data.value.amount")
+            let lotCurrency = teststring <| jsn.SelectToken("data.value.currency")
+            let insertLot = 
+                sprintf 
+                    "INSERT INTO %slot SET id_tender = @id_tender, lot_number = @lot_number, max_price = @max_price, currency = @currency" 
+                    stn.Prefix
+            let cmd12 = new MySqlCommand(insertLot, con)
+            cmd12.Parameters.AddWithValue("@id_tender", !idTender) |> ignore
+            cmd12.Parameters.AddWithValue("@lot_number", lotNumber) |> ignore
+            cmd12.Parameters.AddWithValue("@max_price", lotMaxPrice) |> ignore
+            cmd12.Parameters.AddWithValue("@currency", lotCurrency) |> ignore
+            cmd12.ExecuteNonQuery() |> ignore
+            idLot := int cmd12.LastInsertedId
+            let idCustomer = ref 0
+            if identifierId <> "" then 
+                let selectCustomer = sprintf "SELECT id_customer FROM %scustomer WHERE inn = @inn" stn.Prefix
+                let cmd3 = new MySqlCommand(selectCustomer, con)
+                cmd3.Prepare()
+                cmd3.Parameters.AddWithValue("@inn", identifierId) |> ignore
+                let reader = cmd3.ExecuteReader()
+                match reader.HasRows with
+                | true -> 
+                    reader.Read() |> ignore
+                    idCustomer := reader.GetInt32("id_customer")
+                    reader.Close()
+                | false -> 
+                    reader.Close()
+                    let insertCustomer = 
+                        sprintf "INSERT INTO %scustomer SET reg_num = @reg_num, full_name = @full_name, inn = @inn" 
+                            stn.Prefix
+                    let RegNum = Guid.NewGuid().ToString()
+                    let legalName = teststring <| jsn.SelectToken("data.procuringEntity.identifier.legalName")
+                    let cmd14 = new MySqlCommand(insertCustomer, con)
+                    cmd14.Prepare()
+                    cmd14.Parameters.AddWithValue("@reg_num", RegNum) |> ignore
+                    cmd14.Parameters.AddWithValue("@full_name", legalName) |> ignore
+                    cmd14.Parameters.AddWithValue("@inn", identifierId) |> ignore
+                    cmd14.ExecuteNonQuery() |> ignore
+                    idCustomer := int cmd14.LastInsertedId
+            let items = jsn.SelectToken("data.items")
+            if items <> null then 
+                let GuaranteeAmount = testfloat <| jsn.SelectToken("data.guarantee.amount")
+                for it in items do
+                    let description = teststring <| it.SelectToken("description")
+                    let quantity = testfloat <| it.SelectToken("quantity")
+                    let UnitName = teststring <| it.SelectToken("unit.name")
+                    let scheme = teststring <| it.SelectToken("classification.id")
+                    let classdescript = teststring <| it.SelectToken("classification.description")
+                    let insertLotitem = 
+                        sprintf 
+                            "INSERT INTO %spurchase_object SET id_lot = @id_lot, id_customer = @id_customer, okpd2_code = @okpd2_code, okpd_name = @okpd_name, name = @name, quantity_value = @quantity_value, okei = @okei, customer_quantity_value = @customer_quantity_value" 
+                            stn.Prefix
+                    let cmd19 = new MySqlCommand(insertLotitem, con)
+                    cmd19.Prepare()
+                    cmd19.Parameters.AddWithValue("@id_lot", !idLot) |> ignore
+                    cmd19.Parameters.AddWithValue("@id_customer", !idCustomer) |> ignore
+                    cmd19.Parameters.AddWithValue("@okpd2_code", scheme) |> ignore
+                    cmd19.Parameters.AddWithValue("@okpd_name", classdescript) |> ignore
+                    cmd19.Parameters.AddWithValue("@name", description) |> ignore
+                    cmd19.Parameters.AddWithValue("@quantity_value", quantity) |> ignore
+                    cmd19.Parameters.AddWithValue("@okei", UnitName) |> ignore
+                    cmd19.Parameters.AddWithValue("@customer_quantity_value", quantity) |> ignore
+                    cmd19.ExecuteNonQuery() |> ignore
+                    let postalCode = teststring <| it.SelectToken("deliveryAddress.postalCode")
+                    let countryName = teststring <| it.SelectToken("deliveryAddress.countryName")
+                    let streetAddress = teststring <| it.SelectToken("deliveryAddress.streetAddress")
+                    let region = teststring <| it.SelectToken("deliveryAddress.region")
+                    let locality = teststring <| it.SelectToken("deliveryAddress.locality")
+                    let deliveryPlace = 
+                        (sprintf "%s %s %s %s %s" postalCode countryName region locality streetAddress).Trim()
+                    let startDate = teststring <| it.SelectToken("deliveryDate.startDate")
+                    let endDate = teststring <| it.SelectToken("deliveryDate.endDate")
+                    let deliveryTerm = sprintf "Start date: %s \n End date: %s" startDate endDate
+                    let insertCustomerRequirement = 
+                        sprintf 
+                            "INSERT INTO %scustomer_requirement SET id_lot = @id_lot, id_customer = @id_customer, delivery_place = @delivery_place, delivery_term = @delivery_term, application_guarantee_amount = @application_guarantee_amount" 
+                            stn.Prefix
+                    let cmd16 = new MySqlCommand(insertCustomerRequirement, con)
+                    cmd16.Prepare()
+                    cmd16.Parameters.AddWithValue("@id_lot", !idLot) |> ignore
+                    cmd16.Parameters.AddWithValue("@id_customer", !idCustomer) |> ignore
+                    cmd16.Parameters.AddWithValue("@delivery_place", deliveryPlace) |> ignore
+                    cmd16.Parameters.AddWithValue("@delivery_term", deliveryTerm) |> ignore
+                    cmd16.Parameters.AddWithValue("@application_guarantee_amount", GuaranteeAmount) |> ignore
+                    cmd16.ExecuteNonQuery() |> ignore
+            try 
+                AddVerNumber con tenderID stn
+            with ex -> 
+                Logging.Log.logger "Ошибка добавления версий тендера"
+                Logging.Log.logger ex
             printfn "%d" !idTender
         ()
     
@@ -239,7 +389,7 @@ module Parsing =
             try 
                 let id = d.SelectToken("id")
                 using (new MySqlConnection(connectstring)) (ParserT d stn)
-            with ex -> Logging.Log.logger(ex, id)
+            with ex -> Logging.Log.logger (ex, id)
     
     let ParsungListTenders (j : JObject) (sett : Setting.T) = 
         let connectstring = 

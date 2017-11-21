@@ -337,7 +337,9 @@ module Parsing =
                     cmd7.Parameters.AddWithValue("@url", etpUrl) |> ignore
                     cmd7.ExecuteNonQuery() |> ignore
                     idEtp := int cmd7.LastInsertedId
-            let startDate = testdate <| JsonConvert.SerializeObject(jsn.SelectToken("data.tenderPeriod.startDate"))
+            let mutable startDate = 
+                testdate <| JsonConvert.SerializeObject(jsn.SelectToken("data.tenderPeriod.startDate"))
+            if startDate = DateTime.MinValue then startDate <- dateModified
             //let startDate = enquiryPeriodstartDate
             let endDate = testdate <| JsonConvert.SerializeObject(jsn.SelectToken("data.tenderPeriod.endDate"))
             let biddingDate = testdate <| JsonConvert.SerializeObject(jsn.SelectToken("data.auctionPeriod.startDate"))
@@ -512,7 +514,7 @@ module Parsing =
         //let s = Download.DownloadString("https://stackoverflow.com/questions/15212133/increment-value-in-f")
         let startUrl = 
             sprintf "http://public.api.openprocurement.org/api/2.4/tenders?offset=%s" 
-            <| DateTime.Now.AddHours(-30.).ToString("s")
+            <| DateTime.Now.AddHours(-100.).ToString("s")
         let mutable continueLooping = true
         let mutable urlDown = startUrl
         while continueLooping do

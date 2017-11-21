@@ -207,6 +207,9 @@ module Parsing =
         con.Open()
         let id = teststring <| d.SelectToken("id")
         let dateModified = testdate <| JsonConvert.SerializeObject(d.SelectToken("dateModified"))
+        let dateModified = 
+            new DateTime(dateModified.Year, dateModified.Month, dateModified.Day, dateModified.Hour, dateModified.Minute, 
+                         dateModified.Second, dateModified.Kind)
         let selectTend = 
             sprintf 
                 "SELECT id_tender FROM %stender WHERE id_xml = @id_xml AND date_version = @date_version AND type_fz = 5" 

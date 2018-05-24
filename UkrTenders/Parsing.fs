@@ -349,7 +349,7 @@ module Parsing =
             let scoringDate = DateTime.MinValue
             let numVersion = 0
             let idTender = ref 0
-            let insertTender = sprintf "INSERT INTO %stender SET id_xml = @id_xml, purchase_number = @purchase_number, doc_publish_date = @doc_publish_date, href = @href, purchase_object_info = @purchase_object_info, type_fz = @type_fz, id_organizer = @id_organizer, id_placing_way = @id_placing_way, id_etp = @id_etp, end_date = @end_date, scoring_date = @scoring_date, bidding_date = @bidding_date, cancel = @cancel, date_version = @date_version, num_version = @num_version, notice_version = @notice_version, xml = @xml, print_form = @print_form" stn.Prefix
+            let insertTender = String.Format("INSERT INTO {0}tender SET id_xml = @id_xml, purchase_number = @purchase_number, doc_publish_date = @doc_publish_date, href = @href, purchase_object_info = @purchase_object_info, type_fz = @type_fz, id_organizer = @id_organizer, id_placing_way = @id_placing_way, id_etp = @id_etp, end_date = @end_date, scoring_date = @scoring_date, bidding_date = @bidding_date, cancel = @cancel, date_version = @date_version, num_version = @num_version, notice_version = @notice_version, xml = @xml, print_form = @print_form", stn.Prefix)
             let cmd9 = new MySqlCommand(insertTender, con)
             cmd9.Prepare()
             cmd9.Parameters.AddWithValue("@id_xml", id) |> ignore
@@ -504,7 +504,7 @@ module Parsing =
     let ParsungListTenders (j : JObject) (sett : Setting.T) = 
         let connectstring = 
             sprintf 
-                "Server=%s;port=%d;Database=%s;User Id=%s;password=%s;CharSet=utf8;Convert Zero Datetime=True;default command timeout=3600;Connection Timeout=3600" 
+                "Server=%s;port=%d;Database=%s;User Id=%s;password=%s;CharSet=utf8;Convert Zero Datetime=True;default command timeout=3600;Connection Timeout=3600;SslMode=none"
                 sett.Server sett.Port sett.Database sett.UserDb sett.PassDb
         try 
             parserL j sett connectstring

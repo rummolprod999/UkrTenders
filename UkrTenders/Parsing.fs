@@ -11,34 +11,35 @@ open System.Text
 open System.Text.RegularExpressions
 open System.Xml
 
-module Parsing = 
+module Parsing =
     let tenderCount = ref 0
+    let tenderUpCount = ref 0
     
-    let testint (t : JToken) : int = 
+    let testint (t : JToken) : int =
         match t with
         | null -> 0
         | _ -> (int) t
     
-    let testfloat (t : JToken) : float = 
+    let testfloat (t : JToken) : float =
         match t with
         | null -> 0.
         | _ -> (float) t
     
-    let teststring (t : JToken) : string = 
+    let teststring (t : JToken) : string =
         match t with
         | null -> ""
         | _ -> ((string) t).Trim()
     
-    let testdate (t : string) : DateTime = 
+    let testdate (t : string) : DateTime =
         match t with
         | null | "null" -> DateTime.MinValue
         | _ -> DateTime.Parse(((string) t).Trim('"'))
     
     type Imperative<'T> = unit -> option<'T>
     
-    type ImperativeBuilder() = 
+    type ImperativeBuilder() =
         
-        member x.Combine(a, b) = 
+        member x.Combine(a, b) =
             (fun () -> 
             match a() with
             | Some(v) -> Some(v)
@@ -47,14 +48,14 @@ module Parsing =
         member x.Delay(f : unit -> Imperative<_>) : Imperative<_> = (fun () -> f () ())
         member x.Return(v) : Imperative<_> = (fun () -> Some(v))
         member x.Zero() = (fun () -> None)
-        member x.Run(imp) = 
+        member x.Run(imp) =
             match imp() with
             | Some(v) -> v
             | _ -> failwith "Nothing returned!"
     
-    let AddVerNumber (con : MySqlConnection) (pn : string) (stn : Setting.T) : unit = 
+    let AddVerNumber (con : MySqlConnection) (pn : string) (stn : Setting.T) : unit =
         let verNum = ref 1
-        let selectTenders = 
+        let selectTenders =
             sprintf 
                 "SELECT id_tender FROM %stender WHERE purchase_number = @purchaseNumber AND type_fz = 5 ORDER BY UNIX_TIMESTAMP(date_version) ASC" 
                 stn.Prefix
@@ -66,7 +67,7 @@ module Parsing =
         adapter1.SelectCommand <- cmd1
         adapter1.Fill(dt1) |> ignore
         if dt1.Rows.Count > 0 then 
-            let updateTender = 
+            let updateTender =
                 sprintf "UPDATE %stender SET num_version = @num_version WHERE id_tender = @id_tender" stn.Prefix
             for ten in dt1.Rows do
                 let idTender = (ten.["id_tender"] :?> int)
@@ -78,9 +79,9 @@ module Parsing =
                 incr verNum
         ()
     
-    let TenderKwords (con : MySqlConnection) (idTender : int) (stn : Setting.T) : unit = 
+    let TenderKwords (con : MySqlConnection) (idTender : int) (stn : Setting.T) : unit =
         let resString = new StringBuilder()
-        let selectPurObj = 
+        let selectPurObj =
             sprintf 
                 "SELECT DISTINCT po.name, po.okpd_name FROM %spurchase_object AS po LEFT JOIN %slot AS l ON l.id_lot = po.id_lot WHERE l.id_tender = @id_tender" 
                 stn.Prefix stn.Prefix
@@ -94,12 +95,12 @@ module Parsing =
         if dt.Rows.Count > 0 then 
             let distrDt = dt.AsEnumerable().Distinct(DataRowComparer.Default)
             for row in distrDt do
-                let name = 
+                let name =
                     match row.IsNull("name") with
                     | true -> ""
                     | false -> string <| row.["name"]
                 
-                let okpdName = 
+                let okpdName =
                     match row.IsNull("okpd_name") with
                     | true -> ""
                     | false -> string <| row.["okpd_name"]
@@ -116,13 +117,13 @@ module Parsing =
         if dt2.Rows.Count > 0 then 
             let distrDt = dt2.AsEnumerable().Distinct(DataRowComparer.Default)
             for row in distrDt do
-                let attName = 
+                let attName =
                     match row.IsNull("file_name") with
                     | true -> ""
                     | false -> string <| row.["file_name"]
                 resString.Append(sprintf " %s" attName) |> ignore
         let idOrg = ref 0
-        let selectPurInf = 
+        let selectPurInf =
             sprintf "SELECT purchase_object_info, id_organizer FROM %stender WHERE id_tender = @id_tender" stn.Prefix
         let cmd3 = new MySqlCommand(selectPurInf, con)
         cmd3.Prepare()
@@ -133,7 +134,7 @@ module Parsing =
         adapter3.Fill(dt3) |> ignore
         if dt3.Rows.Count > 0 then 
             for row in dt3.Rows do
-                let purOb = 
+                let purOb =
                     match row.IsNull("purchase_object_info") with
                     | true -> ""
                     | false -> string <| row.["purchase_object_info"]
@@ -143,7 +144,7 @@ module Parsing =
                 resString.Append(sprintf " %s" purOb) |> ignore
         match (!idOrg) <> 0 with
         | true -> 
-            let selectOrg = 
+            let selectOrg =
                 sprintf "SELECT full_name, inn FROM %sorganizer WHERE id_organizer = @id_organizer" stn.Prefix
             let cmd4 = new MySqlCommand(selectOrg, con)
             cmd4.Prepare()
@@ -154,19 +155,19 @@ module Parsing =
             adapter4.Fill(dt4) |> ignore
             if dt4.Rows.Count > 0 then 
                 for row in dt4.Rows do
-                    let innOrg = 
+                    let innOrg =
                         match row.IsNull("inn") with
                         | true -> ""
                         | false -> string <| row.["inn"]
                     
-                    let nameOrg = 
+                    let nameOrg =
                         match row.IsNull("full_name") with
                         | true -> ""
                         | false -> string <| row.["full_name"]
                     
                     resString.Append(sprintf " %s %s" innOrg nameOrg) |> ignore
         | false -> ()
-        let selectCustomer = 
+        let selectCustomer =
             sprintf 
                 "SELECT DISTINCT cus.inn, cus.full_name FROM %scustomer AS cus LEFT JOIN %spurchase_object AS po ON cus.id_customer = po.id_customer LEFT JOIN %slot AS l ON l.id_lot = po.id_lot WHERE l.id_tender = @id_tender" 
                 stn.Prefix stn.Prefix stn.Prefix
@@ -180,12 +181,12 @@ module Parsing =
         if dt5.Rows.Count > 0 then 
             let distrDt = dt5.AsEnumerable().Distinct(DataRowComparer.Default)
             for row in distrDt do
-                let innC = 
+                let innC =
                     match row.IsNull("inn") with
                     | true -> ""
                     | false -> string <| row.["inn"]
                 
-                let fullNameC = 
+                let fullNameC =
                     match row.IsNull("full_name") with
                     | true -> ""
                     | false -> string <| row.["full_name"]
@@ -193,7 +194,7 @@ module Parsing =
                 resString.Append(sprintf " %s %s" innC fullNameC) |> ignore
         let mutable resS = Regex.Replace(resString.ToString(), @"\s+", " ")
         resS <- (resS.Trim())
-        let updateTender = 
+        let updateTender =
             sprintf "UPDATE %stender SET tender_kwords = @tender_kwords WHERE id_tender = @id_tender" stn.Prefix
         let cmd5 = new MySqlCommand(updateTender, con)
         cmd5.Prepare()
@@ -203,14 +204,14 @@ module Parsing =
         if res <> 1 then Logging.Log.logger ("Не удалось обновить tender_kwords", idTender)
         ()
     
-    let ParserT (d : JToken) (stn : Setting.T) (con : MySqlConnection) : unit = 
+    let ParserT (d : JToken) (stn : Setting.T) (con : MySqlConnection) : unit =
         con.Open()
         let id = teststring <| d.SelectToken("id")
         let dateModified = testdate <| JsonConvert.SerializeObject(d.SelectToken("dateModified"))
-        let dateModified = 
+        let dateModified =
             new DateTime(dateModified.Year, dateModified.Month, dateModified.Day, dateModified.Hour, dateModified.Minute, 
                          dateModified.Second, dateModified.Kind)
-        let selectTend = 
+        let selectTend =
             sprintf 
                 "SELECT id_tender FROM %stender WHERE id_xml = @id_xml AND date_version = @date_version AND type_fz = 5" 
                 stn.Prefix
@@ -223,7 +224,8 @@ module Parsing =
         else 
             reader.Close()
             let mutable cancelStatus = 0
-            let selectDateT = 
+            let mutable updated = false
+            let selectDateT =
                 sprintf "SELECT id_tender, date_version, cancel FROM %stender WHERE id_xml = @id_xml AND type_fz = 5" 
                     stn.Prefix
             let cmd2 = new MySqlCommand(selectDateT, con)
@@ -235,6 +237,7 @@ module Parsing =
             adapter.Fill(dt) |> ignore
             for row in dt.Rows do
                 //printfn "%A" <| (row.["date_version"])
+                updated <- true
                 match dateModified >= ((row.["date_version"]) :?> DateTime) with
                 | true -> row.["cancel"] <- 1
                 | false -> cancelStatus <- 1
@@ -246,7 +249,7 @@ module Parsing =
             let jsn = JObject.Parse(ten)
             (*let enquiryPeriodstartDateS = (string) <| JsonConvert.SerializeObject(jsn.SelectToken("data.enquiryPeriod.startDate"))
             printfn "%A %d" enquiryPeriodstartDateS enquiryPeriodstartDateS.Length*)
-            let enquiryPeriodstartDate = 
+            let enquiryPeriodstartDate =
                 testdate <| JsonConvert.SerializeObject(jsn.SelectToken("data.enquiryPeriod.startDate"))
             //printfn "%A" enquiryPeriodstartDate
             let tenderID = teststring <| jsn.SelectToken("data.tenderID")
@@ -279,9 +282,9 @@ module Parsing =
                     let streetAddress = teststring <| jsn.SelectToken("data.procuringEntity.address.streetAddress")
                     let locality = teststring <| jsn.SelectToken("data.procuringEntity.address.locality")
                     let region = teststring <| jsn.SelectToken("data.procuringEntity.address.region")
-                    let factAddress = 
+                    let factAddress =
                         (sprintf "%s %s %s %s %s" postalCode countryName region locality streetAddress).Trim()
-                    let addOrganizer = 
+                    let addOrganizer =
                         sprintf 
                             "INSERT INTO %sorganizer SET full_name = @full_name, post_address = @post_address, fact_address = @fact_address, inn = @inn, contact_person = @contact_person, contact_email = @contact_email, contact_phone = @contact_phone" 
                             stn.Prefix
@@ -340,7 +343,7 @@ module Parsing =
                     cmd7.Parameters.AddWithValue("@url", etpUrl) |> ignore
                     cmd7.ExecuteNonQuery() |> ignore
                     idEtp := int cmd7.LastInsertedId
-            let mutable startDate = 
+            let mutable startDate =
                 testdate <| JsonConvert.SerializeObject(jsn.SelectToken("data.tenderPeriod.startDate"))
             if startDate = DateTime.MinValue then startDate <- dateModified
             //let startDate = enquiryPeriodstartDate
@@ -349,7 +352,10 @@ module Parsing =
             let scoringDate = DateTime.MinValue
             let numVersion = 0
             let idTender = ref 0
-            let insertTender = String.Format("INSERT INTO {0}tender SET id_xml = @id_xml, purchase_number = @purchase_number, doc_publish_date = @doc_publish_date, href = @href, purchase_object_info = @purchase_object_info, type_fz = @type_fz, id_organizer = @id_organizer, id_placing_way = @id_placing_way, id_etp = @id_etp, end_date = @end_date, scoring_date = @scoring_date, bidding_date = @bidding_date, cancel = @cancel, date_version = @date_version, num_version = @num_version, notice_version = @notice_version, xml = @xml, print_form = @print_form", stn.Prefix)
+            let insertTender =
+                String.Format
+                    ("INSERT INTO {0}tender SET id_xml = @id_xml, purchase_number = @purchase_number, doc_publish_date = @doc_publish_date, href = @href, purchase_object_info = @purchase_object_info, type_fz = @type_fz, id_organizer = @id_organizer, id_placing_way = @id_placing_way, id_etp = @id_etp, end_date = @end_date, scoring_date = @scoring_date, bidding_date = @bidding_date, cancel = @cancel, date_version = @date_version, num_version = @num_version, notice_version = @notice_version, xml = @xml, print_form = @print_form", 
+                     stn.Prefix)
             let cmd9 = new MySqlCommand(insertTender, con)
             cmd9.Prepare()
             cmd9.Parameters.AddWithValue("@id_xml", id) |> ignore
@@ -372,7 +378,9 @@ module Parsing =
             cmd9.Parameters.AddWithValue("@print_form", Printform) |> ignore
             cmd9.ExecuteNonQuery() |> ignore
             idTender := int cmd9.LastInsertedId
-            incr tenderCount
+            match updated with
+            | true -> incr tenderUpCount
+            | false -> incr tenderCount
             let doctend = jsn.SelectToken("data.documents")
             if doctend <> null then 
                 for doc in jsn.SelectToken("data.documents") do
@@ -380,7 +388,7 @@ module Parsing =
                     let attachDescription = teststring <| doc.SelectToken("documentType")
                     let attachUrl = teststring <| doc.SelectToken("url")
                     if attachUrl <> "" then 
-                        let insertAttach = 
+                        let insertAttach =
                             sprintf 
                                 "INSERT INTO %sattachment SET id_tender = @id_tender, file_name = @file_name, url = @url, description = @description" 
                                 stn.Prefix
@@ -395,7 +403,7 @@ module Parsing =
             let idLot = ref 0
             let lotMaxPrice = testfloat <| jsn.SelectToken("data.value.amount")
             let lotCurrency = teststring <| jsn.SelectToken("data.value.currency")
-            let insertLot = 
+            let insertLot =
                 sprintf 
                     "INSERT INTO %slot SET id_tender = @id_tender, lot_number = @lot_number, max_price = @max_price, currency = @currency" 
                     stn.Prefix
@@ -420,7 +428,7 @@ module Parsing =
                     reader.Close()
                 | false -> 
                     reader.Close()
-                    let insertCustomer = 
+                    let insertCustomer =
                         sprintf "INSERT INTO %scustomer SET reg_num = @reg_num, full_name = @full_name, inn = @inn" 
                             stn.Prefix
                     let RegNum = Guid.NewGuid().ToString()
@@ -441,7 +449,7 @@ module Parsing =
                     let UnitName = teststring <| it.SelectToken("unit.name")
                     let scheme = teststring <| it.SelectToken("classification.id")
                     let classdescript = teststring <| it.SelectToken("classification.description")
-                    let insertLotitem = 
+                    let insertLotitem =
                         sprintf 
                             "INSERT INTO %spurchase_object SET id_lot = @id_lot, id_customer = @id_customer, okpd2_code = @okpd2_code, okpd_name = @okpd_name, name = @name, quantity_value = @quantity_value, okei = @okei, customer_quantity_value = @customer_quantity_value" 
                             stn.Prefix
@@ -461,12 +469,12 @@ module Parsing =
                     let streetAddress = teststring <| it.SelectToken("deliveryAddress.streetAddress")
                     let region = teststring <| it.SelectToken("deliveryAddress.region")
                     let locality = teststring <| it.SelectToken("deliveryAddress.locality")
-                    let deliveryPlace = 
+                    let deliveryPlace =
                         (sprintf "%s %s %s %s %s" postalCode countryName region locality streetAddress).Trim()
                     let startDate = teststring <| it.SelectToken("deliveryDate.startDate")
                     let endDate = teststring <| it.SelectToken("deliveryDate.endDate")
                     let deliveryTerm = sprintf "Start date: %s \n End date: %s" startDate endDate
-                    let insertCustomerRequirement = 
+                    let insertCustomerRequirement =
                         sprintf 
                             "INSERT INTO %scustomer_requirement SET id_lot = @id_lot, id_customer = @id_customer, delivery_place = @delivery_place, delivery_term = @delivery_term, application_guarantee_amount = @application_guarantee_amount" 
                             stn.Prefix
@@ -491,7 +499,7 @@ module Parsing =
         ()
     
     //printfn "%d" !idTender
-    let parserL (o : JObject) (stn : Setting.T) (connectstring : string) : unit = 
+    let parserL (o : JObject) (stn : Setting.T) (connectstring : string) : unit =
         //let uri = teststring <| o.SelectToken("next_page.uri")
         //printfn "%A" uri
         let tdata = o.SelectToken("data") :?> JArray
@@ -501,18 +509,18 @@ module Parsing =
                 using (new MySqlConnection(connectstring)) (ParserT d stn)
             with ex -> Logging.Log.logger (ex, id)
     
-    let ParsungListTenders (j : JObject) (sett : Setting.T) = 
-        let connectstring = 
+    let ParsungListTenders (j : JObject) (sett : Setting.T) =
+        let connectstring =
             sprintf 
-                "Server=%s;port=%d;Database=%s;User Id=%s;password=%s;CharSet=utf8;Convert Zero Datetime=True;default command timeout=3600;Connection Timeout=3600;SslMode=none"
+                "Server=%s;port=%d;Database=%s;User Id=%s;password=%s;CharSet=utf8;Convert Zero Datetime=True;default command timeout=3600;Connection Timeout=3600;SslMode=none" 
                 sett.Server sett.Port sett.Database sett.UserDb sett.PassDb
         try 
             parserL j sett connectstring
         with x -> Logging.Log.logger x
     
-    let Parsing(st : Setting.T) = 
+    let Parsing(st : Setting.T) =
         //let s = Download.DownloadString("https://stackoverflow.com/questions/15212133/increment-value-in-f")
-        let startUrl = 
+        let startUrl =
             sprintf "http://public.api.openprocurement.org/api/2.4/tenders?offset=%s" 
             <| DateTime.Now.AddHours(-100.).ToString("s")
         let mutable continueLooping = true
@@ -523,7 +531,7 @@ module Parsing =
             | s -> 
                 let json = JObject.Parse(s)
                 
-                let tpl = 
+                let tpl =
                     let uri = ((string) (json.SelectToken("next_page.uri")))
                     //printf "%A" uri
                     let count = ((json.SelectToken("data")) :?> JArray).Count

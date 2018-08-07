@@ -247,7 +247,7 @@ module Parsing =
             commandBuilder.ConflictOption <- ConflictOption.OverwriteChanges
             adapter.Update(dt) |> ignore
             let tenurl = sprintf "http://public.api.openprocurement.org/api/2.4/tenders/%s" id
-            let ten = Download.DownloadString tenurl
+            let ten = Download.DownloadStringMysql tenurl con
             let jsn = JObject.Parse(ten)
             (*let enquiryPeriodstartDateS = (string) <| JsonConvert.SerializeObject(jsn.SelectToken("data.enquiryPeriod.startDate"))
             printfn "%A %d" enquiryPeriodstartDateS enquiryPeriodstartDateS.Length*)

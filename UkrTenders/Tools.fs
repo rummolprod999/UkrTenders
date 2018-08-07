@@ -63,8 +63,8 @@ module Download =
                     continueLooping <- false
                 else raise <| new TimeoutException()
             with _ -> 
-                con.Ping |> ignore
-                if !count >= 10 then 
+                con.Ping() |> ignore
+                if !count >= 30 then 
                     Logging.Log.logger (sprintf "Не удалось скачать %s xml за %d попыток" url !count)
                     continueLooping <- false
                 else incr count

@@ -220,7 +220,9 @@ module Parsing =
         cmd.Parameters.AddWithValue("@id_xml", id) |> ignore
         cmd.Parameters.AddWithValue("@date_version", dateModified) |> ignore
         let reader : MySqlDataReader = cmd.ExecuteReader()
-        if reader.HasRows then reader.Close()
+        if reader.HasRows then 
+            reader.Close()
+            con.Close()
         else 
             reader.Close()
             let mutable cancelStatus = 0

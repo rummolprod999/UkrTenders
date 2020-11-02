@@ -2,7 +2,6 @@ namespace Ukr
 
 open MySql.Data.MySqlClient
 open System
-open System.Globalization
 open System.IO
 open System.Net
 open System.Text
@@ -41,7 +40,7 @@ module Download =
                 if task.Wait(TimeSpan.FromSeconds(100.)) then 
                     s <- task.Result
                     continueLooping <- false
-                else raise <| new TimeoutException()
+                else raise <| TimeoutException()
             with _ -> 
                 if !count >= 10 then 
                     Logging.Log.logger (sprintf "Не удалось скачать %s xml за %d попыток" url !count)
@@ -61,7 +60,7 @@ module Download =
                 if task.Wait(TimeSpan.FromSeconds(100.)) then 
                     s <- task.Result
                     continueLooping <- false
-                else raise <| new TimeoutException()
+                else raise <| TimeoutException()
             with _ -> 
                 con.Ping() |> ignore
                 if !count >= 30 then 

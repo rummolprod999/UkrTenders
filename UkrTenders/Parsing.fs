@@ -4,12 +4,10 @@ open MySql.Data.MySqlClient
 open Newtonsoft.Json
 open Newtonsoft.Json.Linq
 open System
-open System.Collections.Generic
 open System.Data
 open System.Linq
 open System.Text
 open System.Text.RegularExpressions
-open System.Xml
 
 module Parsing =
     let tenderCount = ref 0
@@ -80,7 +78,7 @@ module Parsing =
         ()
     
     let TenderKwords (con : MySqlConnection) (idTender : int) (stn : Setting.T) : unit =
-        let resString = new StringBuilder()
+        let resString = StringBuilder()
         let selectPurObj =
             sprintf 
                 "SELECT DISTINCT po.name, po.okpd_name FROM %spurchase_object AS po LEFT JOIN %slot AS l ON l.id_lot = po.id_lot WHERE l.id_tender = @id_tender" 
@@ -209,7 +207,7 @@ module Parsing =
         let id = teststring <| d.SelectToken("id")
         let dateModified = testdate <| JsonConvert.SerializeObject(d.SelectToken("dateModified"))
         let dateModified =
-            new DateTime(dateModified.Year, dateModified.Month, dateModified.Day, dateModified.Hour, dateModified.Minute, 
+            DateTime(dateModified.Year, dateModified.Month, dateModified.Day, dateModified.Hour, dateModified.Minute, 
                          dateModified.Second, dateModified.Kind)
         let selectTend =
             sprintf 
@@ -540,7 +538,7 @@ module Parsing =
                     (uri, count)
                 match tpl with
                 | (null, _) -> continueLooping <- false
-                | (x, cnt) when cnt < 100 -> 
+                | (_, cnt) when cnt < 100 -> 
                     ParsungListTenders json st
                     continueLooping <- false
                 | (x, _) -> 

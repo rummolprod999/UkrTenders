@@ -21,7 +21,7 @@ module Parser =
         else 
             match Directory.Exists(s.TempPathTenders) with
             | true -> 
-                let dirInfo = new DirectoryInfo(s.TempPathTenders)
+                let dirInfo = DirectoryInfo(s.TempPathTenders)
                 dirInfo.Delete(true)
                 Directory.CreateDirectory(s.TempPathTenders) |> ignore
             | false -> Directory.CreateDirectory(s.TempPathTenders) |> ignore

@@ -1,7 +1,4 @@
 ﻿namespace Ukr
-open System.Reflection
-open System
-open System.IO
 module UkrModule =
     
     [<EntryPoint>]
